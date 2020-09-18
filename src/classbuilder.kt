@@ -37,15 +37,7 @@ object ClassPathProtected: ProtectedMemberLookup {
         cache.computeIfAbsent(member) {
             runCatching {
                 with(member) {
-                    val clazz = Class.forName(className.replace("/", "."))
-                    when (member) {
-                        is ProtectedMember.Field -> listOf(clazz.getDeclaredField(memberName).modifiers)
-                        is ProtectedMember.Method -> clazz
-                            .declaredMethods
-                            //we do not track signature for now
-                            .filter { it.name == memberName }
-                            .map { it.modifiers }
-                    }.any(Modifier::isProtected)
+                    member in listProtectedMembers(ClassReader(className))
                 }
             }.getOrNull() == true
         }
@@ -139,6 +131,10 @@ sealed class ProtectedMember {
 
 private fun listProtectedMembers(file: Path) : List<ProtectedMember> {
     val reader = ClassReader(Files.readAllBytes(file))
+    return listProtectedMembers(reader)
+}
+
+private fun listProtectedMembers(reader: ClassReader) : List<ProtectedMember> {
     val protectedMembers = mutableListOf<ProtectedMember>()
 
     val className = reader.className
