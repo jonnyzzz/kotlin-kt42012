@@ -10,6 +10,7 @@ import kotlin.streams.toList
 fun main() {
 
     val protectedLookup = collectProtectedMembers()
+//    val protectedLookup = ClassPathProtected
 
     val home = Paths.get("/Users/jonnyzzz/Work/intellij-kt14/out")
 //    val home = Paths.get("out")
@@ -17,10 +18,10 @@ fun main() {
         .parallel()
         .filter { Files.isReadable(it) && it.fileName.toString().endsWith(".class") }
         .toList()
-        .stream().parallel().forEach {
-            readClass(it, protectedLookup)
-        }
 
+    classes.stream().parallel().forEach {
+        readClass(it, protectedLookup)
+    }
 }
 
 class StopParsing : RuntimeException()
@@ -95,8 +96,9 @@ private fun readClassInt(file: Path, protectedLookup: ProtectedMemberLookup) {
                     if (opcode == Opcodes.INVOKEINTERFACE) return
                     if (opcode == Opcodes.INVOKESTATIC) return
                     if (opcode == Opcodes.INVOKESTATIC) return
+                    if (name == "<init>") return
                     if (isSkipClass(owner, name)) return
-                    accessFields += "Method [" + owner + "]." + name + " @ " + descriptor + " in " + methodName
+                    accessFields += "Method [$owner].$name @ $descriptor in $methodName"
                 }
             }
         }
@@ -104,9 +106,8 @@ private fun readClassInt(file: Path, protectedLookup: ProtectedMemberLookup) {
 
     if (accessFields.isEmpty()) return
 
-    println("class: " + className)
+    println("class: $className")
     for (accessField in accessFields.toSortedSet()) {
-        println("  " + accessField)
+        println("  $accessField")
     }
-
 }

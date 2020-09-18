@@ -27,6 +27,20 @@ interface ProtectedMemberLookup {
     fun isProtectedMember(className: String, memberName: String) : Boolean
 }
 
+object AllProtected : ProtectedMemberLookup {
+    override fun isProtectedMember(className: String, memberName: String) = true
+}
+
+object ClassPathProtected: ProtectedMemberLookup {
+    private val cache = ConcurrentHashMap<ProtectedMember, Boolean>()
+    override fun isProtectedMember(className: String, memberName: String) =
+        cache.computeIfAbsent(ProtectedMember(className, memberName)) {
+            runCatching {
+                Modifier.isProtected(Class.forName(className.replace("/", ".")).getDeclaredField(memberName).modifiers)
+            }.getOrNull() == true
+        }
+}
+
 fun collectProtectedMembers() :ProtectedMemberLookup{
     val model = JpsElementFactory.getInstance().createModel() ?: throw Exception("Couldn't create JpsModel")
 
@@ -88,16 +102,10 @@ fun collectProtectedMembers() :ProtectedMemberLookup{
 
     val allMembersSet = allProtectedMembers.groupBy { it }
     return object : ProtectedMemberLookup {
-        val cache = ConcurrentHashMap<ProtectedMember, Boolean>()
         override fun isProtectedMember(className: String, memberName: String): Boolean {
             val protectedMember = ProtectedMember(className, memberName)
             if (protectedMember in allMembersSet) return true
-
-            return cache.computeIfAbsent(protectedMember) {
-                runCatching {
-                    Modifier.isProtected(Class.forName(className).getDeclaredField(memberName).modifiers)
-                }.getOrNull() == true
-            }
+            return ClassPathProtected.isProtectedMember(className, memberName)
         }
     }
 }
