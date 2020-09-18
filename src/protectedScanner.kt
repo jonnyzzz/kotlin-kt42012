@@ -50,12 +50,19 @@ private fun readClassInt(file: Path, protectedLookup: ProtectedMemberLookup) {
     val className = reader.className
     val accessFields = mutableListOf<String>()
 
-    fun isSkipClass(clazz: String, member: String) : Boolean {
+    val superName : String? = reader.superName
+
+    fun isSkipClass(member: ProtectedMember) : Boolean {
+        val clazz = member.className
         if (clazz == "java/lang/StringBuilder") return true
         if (clazz.startsWith("kotlin/")) return true
         if (clazz == className) return true
+
+        //no need to care about direct base class and we do not have the hierarchy anyways
+        if (clazz == superName) return true
+
         if (isSamePackage(className, clazz)) return true
-        if (!protectedLookup.isProtectedMember(clazz, member)) return true
+        if (!protectedLookup.isProtectedMember(member)) return true
         return false
     }
 
@@ -82,7 +89,7 @@ private fun readClassInt(file: Path, protectedLookup: ProtectedMemberLookup) {
                 override fun visitFieldInsn(opcode: Int, owner: String, name: String, descriptor: String) {
                     if (opcode == Opcodes.GETSTATIC) return
                     if (opcode == Opcodes.PUTSTATIC) return
-                    if (isSkipClass(owner, name)) return
+                    if (isSkipClass(ProtectedMember.Field(owner, name))) return
                     accessFields += "Field [$owner].$name @ $descriptor in $methodName"
                 }
 
@@ -97,7 +104,7 @@ private fun readClassInt(file: Path, protectedLookup: ProtectedMemberLookup) {
                     if (opcode == Opcodes.INVOKESTATIC) return
                     if (opcode == Opcodes.INVOKESTATIC) return
                     if (name == "<init>") return
-                    if (isSkipClass(owner, name)) return
+                    if (isSkipClass(ProtectedMember.Method(owner, name))) return
                     accessFields += "Method [$owner].$name @ $descriptor in $methodName"
                 }
             }

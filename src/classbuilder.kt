@@ -24,19 +24,29 @@ fun main() {
 }
 
 interface ProtectedMemberLookup {
-    fun isProtectedMember(className: String, memberName: String) : Boolean
+    fun isProtectedMember(member: ProtectedMember) : Boolean
 }
 
 object AllProtected : ProtectedMemberLookup {
-    override fun isProtectedMember(className: String, memberName: String) = true
+    override fun isProtectedMember(member: ProtectedMember) = true
 }
 
 object ClassPathProtected: ProtectedMemberLookup {
     private val cache = ConcurrentHashMap<ProtectedMember, Boolean>()
-    override fun isProtectedMember(className: String, memberName: String) =
-        cache.computeIfAbsent(ProtectedMember(className, memberName)) {
+    override fun isProtectedMember(member: ProtectedMember) =
+        cache.computeIfAbsent(member) {
             runCatching {
-                Modifier.isProtected(Class.forName(className.replace("/", ".")).getDeclaredField(memberName).modifiers)
+                with(member) {
+                    val clazz = Class.forName(className.replace("/", "."))
+                    when (member) {
+                        is ProtectedMember.Field -> listOf(clazz.getDeclaredField(memberName).modifiers)
+                        is ProtectedMember.Method -> clazz
+                            .declaredMethods
+                            //we do not track signature for now
+                            .filter { it.name == memberName }
+                            .map { it.modifiers }
+                    }.any(Modifier::isProtected)
+                }
             }.getOrNull() == true
         }
 }
@@ -102,19 +112,28 @@ fun collectProtectedMembers() :ProtectedMemberLookup{
 
     val allMembersSet = allProtectedMembers.groupBy { it }
     return object : ProtectedMemberLookup {
-        override fun isProtectedMember(className: String, memberName: String): Boolean {
-            val protectedMember = ProtectedMember(className, memberName)
-            if (protectedMember in allMembersSet) return true
-            return ClassPathProtected.isProtectedMember(className, memberName)
+        override fun isProtectedMember(member: ProtectedMember): Boolean {
+            if (member in allMembersSet) return true
+            return ClassPathProtected.isProtectedMember(member)
         }
     }
 }
 
-private data class ProtectedMember(
-    val className: String,
-    val memberName: String
-) {
-    var extra: String? = null
+sealed class ProtectedMember {
+    abstract val className: String
+    abstract val memberName: String
+
+    var extra: String = ""
+
+    data class Method(
+        override val className: String,
+        override val memberName: String
+    ) : ProtectedMember()
+
+    data class Field(
+        override val className: String,
+        override val memberName: String
+    ) : ProtectedMember()
 }
 
 
@@ -133,7 +152,7 @@ private fun listProtectedMembers(file: Path) : List<ProtectedMember> {
             value: Any?
         ): FieldVisitor? = null.apply {
             if (access and Opcodes.ACC_PROTECTED == Opcodes.ACC_PROTECTED) {
-                protectedMembers += ProtectedMember(className, name).also { it.extra = "Field: $name @ $descriptor" }
+                protectedMembers += ProtectedMember.Field(className, name).also { it.extra = "Field: $name @ $descriptor" }
             }
         }
 
@@ -145,7 +164,7 @@ private fun listProtectedMembers(file: Path) : List<ProtectedMember> {
             exceptions: Array<out String>?
         ): MethodVisitor? = null.apply {
             if (access and Opcodes.ACC_PROTECTED == Opcodes.ACC_PROTECTED) {
-                protectedMembers += ProtectedMember(className, name).also { it.extra = "Member: $name @ $descriptor" }
+                protectedMembers += ProtectedMember.Method(className, name).also { it.extra = "Member: $name @ $descriptor" }
             }
         }
     }, ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES)
