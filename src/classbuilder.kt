@@ -119,7 +119,8 @@ sealed class ProtectedMember {
 
     data class Method(
         override val className: String,
-        override val memberName: String
+        override val memberName: String,
+        val signature: String
     ) : ProtectedMember()
 
     data class Field(
@@ -155,12 +156,12 @@ private fun listProtectedMembers(reader: ClassReader) : List<ProtectedMember> {
         override fun visitMethod(
             access: Int,
             name: String,
-            descriptor: String?,
+            descriptor: String,
             signature: String?,
             exceptions: Array<out String>?
         ): MethodVisitor? = null.apply {
             if (access and Opcodes.ACC_PROTECTED == Opcodes.ACC_PROTECTED) {
-                protectedMembers += ProtectedMember.Method(className, name).also { it.extra = "Member: $name @ $descriptor" }
+                protectedMembers += ProtectedMember.Method(className, name, descriptor).also { it.extra = "Member: $name @ $descriptor" }
             }
         }
     }, ClassReader.SKIP_CODE or ClassReader.SKIP_DEBUG or ClassReader.SKIP_FRAMES)

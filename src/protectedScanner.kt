@@ -104,7 +104,7 @@ private fun readClassInt(file: Path, protectedLookup: ProtectedMemberLookup) {
                     if (opcode == Opcodes.INVOKESTATIC) return
                     if (opcode == Opcodes.INVOKESTATIC) return
                     if (name == "<init>") return
-                    if (isSkipClass(ProtectedMember.Method(owner, name))) return
+                    if (isSkipClass(ProtectedMember.Method(owner, name, descriptor))) return
                     accessFields += "Method [$owner].$name @ $descriptor in $methodName"
                 }
             }

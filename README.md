@@ -347,6 +347,7 @@ a report that was easy to test:
 To make sure the tool works, I've reverted the real bug to test if it
 is included:
 
+```
 ... 
 class: com/android/tools/idea/gradle/structure/configurables/variables/VariablesTable$NameCellEditor
   Field [javax/swing/JTable].selectionBackground @ Ljava/awt/Color; in getTableCellEditorComponent
@@ -354,4 +355,22 @@ class: com/android/tools/idea/gradle/structure/configurables/variables/Variables
 
 We can hope the tool works as expected
         
+## Optimization
 
+We use ASM to process classes from classpath too. 
+Now we could include method signature to avoid false positives. 
+Finally, the output is:
+
+``` 
+Collected 3882 roots
+Collected 429088 classes
+Collected 229905 protected members
+class: com/intellij/javascript/debugger/execution/JavaScriptDebugConfigurationProducer
+  Method [java/lang/Object].clone @ ()Ljava/lang/Object; in clone
+class: com/intellij/openapi/wm/impl/WindowInfoImpl
+  Method [java/lang/Object].clone @ ()Ljava/lang/Object; in clone
+class: com/intellij/workspaceModel/storage/impl/containers/MutableNonNegativeIntIntMultiMap
+  Method [java/lang/Object].clone @ ()Ljava/lang/Object; in startWrite
+class: com/android/tools/idea/gradle/structure/configurables/variables/VariablesTable$NameCellEditor
+  Field [javax/swing/JTable].selectionBackground @ Ljava/awt/Color; in getTableCellEditorComponent
+```
